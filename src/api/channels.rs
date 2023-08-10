@@ -1,11 +1,12 @@
 use crate::state::AppState;
 use axum::extract::{Path, State};
+use axum::headers::authorization::Bearer;
+use axum::headers::Authorization;
 use axum::routing::{get, post};
-use axum::{Json, Router};
+use axum::{Json, Router, TypedHeader};
 use serde::{Deserialize, Serialize};
 
-use crate::api::devices::Device;
-use crate::api::error::Result;
+use crate::api::error::{Error, Result};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Channel {
@@ -16,6 +17,7 @@ pub(crate) fn router() -> Router<AppState> {
     Router::new()
         .route("/list", get(list))
         .route("/create", post(create))
+        .route("/subscribe/:channel_id", post(subscribe))
 }
 
 async fn list(State(state): State<AppState>) -> Result<Json<Vec<Channel>>> {
@@ -43,7 +45,27 @@ async fn create(State(state): State<AppState>) -> Result<Json<Channel>> {
 async fn subscribe(
     State(state): State<AppState>,
     channel_id: Path<i64>,
-    device: Json<Device>,
+    auth: TypedHeader<Authorization<Bearer>>,
 ) -> Result<()> {
-    unimplemented!()
+    let token = auth.token();
+    let remote_device_id = sqlx::query!(
+        "SELECT remoteDeviceId as device_id FROM REMOTE_DEVICE WHERE remoteDeviceToken = ?",
+        token
+    )
+    .map(|r| r.device_id)
+    .fetch_optional(state.conn())
+    .await?;
+
+    if let Some(remote_device_id) = remote_device_id {
+        sqlx::query!(
+            "INSERT INTO SUBSCRIBED(remoteDeviceId, channelId) VALUES(?, ?)",
+            remote_device_id,
+            *channel_id
+        )
+        .execute(state.conn())
+        .await?;
+        Ok(())
+    } else {
+        Err(Error::DeviceNotFound())
+    }
 }
