@@ -12,6 +12,8 @@ pub(crate) enum Error {
     Network(#[from] reqwest::Error),
     #[error("invalid push url")]
     InvalidPushUrl(),
+    #[error("device not found")]
+    DeviceNotFound(),
 }
 
 #[derive(Serialize)]
@@ -42,6 +44,11 @@ impl IntoResponse for Error {
                 Json(ErrorResponse::new("Bad Request", Some("Invalid Push URL"))),
             )
                 .into_response(),
+            Self::DeviceNotFound() => (
+                StatusCode::UNAUTHORIZED,
+                Json(ErrorResponse::new("Unauthorized", Some("Device not found"))),
+            )
+                .into_response(),
             e => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(ErrorResponse::new(
@@ -61,6 +68,11 @@ impl IntoResponse for Error {
             Self::InvalidPushUrl() => (
                 StatusCode::BAD_REQUEST,
                 Json(ErrorResponse::new("Bad Request", Some("Invalid Push URL"))),
+            )
+                .into_response(),
+            Self::DeviceNotFound() => (
+                StatusCode::UNAUTHORIZED,
+                Json(ErrorResponse::new("Unauthorized", None)),
             )
                 .into_response(),
             e => (
