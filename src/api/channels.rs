@@ -1,4 +1,3 @@
-use crate::state::AppState;
 use axum::extract::{Path, State};
 use axum::headers::authorization::Bearer;
 use axum::headers::Authorization;
@@ -6,7 +5,10 @@ use axum::routing::{get, post};
 use axum::{Json, Router, TypedHeader};
 use serde::{Deserialize, Serialize};
 
+use futures::TryStreamExt;
+
 use crate::api::error::{Error, Result};
+use crate::state::AppState;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Channel {
@@ -77,6 +79,15 @@ struct SendBody {
     content: String,
 }
 
-async fn send(State(state): State<AppState>, channel_id: Path<i64>) -> Result<()> {
+async fn send(
+    State(state): State<AppState>,
+    channel_id: Path<i64>,
+    Json(body): Json<SendBody>,
+) -> Result<()> {
+    let mut remote_stream = sqlx::query!("SELECT R.remoteDeviceUrl as url FROM CHANNEL C INNER JOIN SUBSCRIBED S ON C.channelId = S.channelId INNER JOIN REMOTE_DEVICE R ON S.remoteDeviceId = R.remoteDeviceId WHERE C.channelId = ?", *channel_id).map(|r| r.url).fetch(state.conn());
+
+    while let Some(url) = remote_stream.try_next().await? {
+        state.client().post(&url).json(&body).send().await?;
+    }
     Ok(())
 }
