@@ -18,6 +18,7 @@ pub(crate) fn router() -> Router<AppState> {
         .route("/list", get(list))
         .route("/create", post(create))
         .route("/subscribe/:channel_id", post(subscribe))
+        .route("/send/:channel_id", post(send))
 }
 
 async fn list(State(state): State<AppState>) -> Result<Json<Vec<Channel>>> {
@@ -68,4 +69,14 @@ async fn subscribe(
     } else {
         Err(Error::DeviceNotFound())
     }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct SendBody {
+    title: String,
+    content: String,
+}
+
+async fn send(State(state): State<AppState>, channel_id: Path<i64>) -> Result<()> {
+    Ok(())
 }
