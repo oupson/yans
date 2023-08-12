@@ -1,4 +1,9 @@
-use axum::{extract::State, routing::post, Json, Router};
+use axum::{
+    extract::State,
+    headers::{authorization::Bearer, Authorization},
+    routing::post,
+    Json, Router, TypedHeader,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -7,7 +12,9 @@ use crate::{
 };
 
 pub(crate) fn router() -> Router<AppState> {
-    Router::new().route("/register", post(register))
+    Router::new()
+        .route("/register", post(register))
+        .route("/unregister", post(unregister))
 }
 
 #[derive(Deserialize)]
@@ -43,4 +50,11 @@ async fn register(
     } else {
         Err(Error::InvalidPushUrl())
     }
+}
+
+async fn unregister(
+    State(_state): State<AppState>,
+    auth: TypedHeader<Authorization<Bearer>>,
+) -> Result<()> {
+    unimplemented!()
 }
