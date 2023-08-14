@@ -52,9 +52,25 @@ async fn register(
     }
 }
 
+
 async fn unregister(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     auth: TypedHeader<Authorization<Bearer>>,
 ) -> Result<()> {
-    unimplemented!()
+    let token = auth.token();
+    let remote_device_id = sqlx::query!(
+        "SELECT remoteDeviceId as device_id FROM REMOTE_DEVICE WHERE remoteDeviceToken = ?",
+        token
+    )
+    .map(|r| r.device_id)
+    .fetch_optional(state.conn())
+    .await?;
+
+    if let Some(remote_device_id) = remote_device_id {
+        sqlx::query!("DELETE FROM SUBSCRIBED WHERE remoteDeviceId = ?", remote_device_id).execute(state.conn()).await?;
+        sqlx::query!("DELETE FROM REMOTE_DEVICE WHERE remoteDeviceId = ?", remote_device_id).execute(state.conn()).await?;
+        Ok(())
+    } else {
+        Err(Error::DeviceNotFound())
+    }
 }
